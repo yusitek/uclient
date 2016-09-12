@@ -42,6 +42,7 @@
 #endif
 
 static const char *user_agent = "uclient-fetch";
+static const char *custom_header_file = "";
 static const char *post_data;
 static struct ustream_ssl_ctx *ssl_ctx;
 static const struct ustream_ssl_ops *ssl_ops;
@@ -445,6 +446,7 @@ static int usage(const char *progname)
 		"	-q				Turn off status messages\n"
 		"	-O <file>			Redirect output to file (use \"-\" for stdout)\n"
 		"	-P <dir>			Set directory for output files\n"
+		"	-H <filename>			Set custom HTTP header file\n"
 		"	--user=<user>			HTTP authentication username\n"
 		"	--password=<password>		HTTP authentication password\n"
 		"	--user-agent|-U <str>		Set HTTP user agent\n"
@@ -528,6 +530,48 @@ static const struct option longopts[] = {
 };
 
 
+static char * read_http_header(const char *fname)
+{
+    FILE *fp;
+    char *ret_str = NULL;
+
+    fp = fopen(fname, "rb");
+    if(!fp) {
+        fprintf(stderr, "Error reading Http Header file `%s': %s", fname, strerror(errno));
+        //free(fname);
+
+    } else {
+        int status = 0;
+        status = fseek(fp, 0, SEEK_END);
+        if (status != 0) {
+            goto closefile;
+        }
+
+        long fsize = ftell(fp);
+        status = fseek(fp, 0, SEEK_SET);  //rewind(fp);
+        if (status != 0) {
+            goto closefile;
+        }
+
+        ret_str = malloc(fsize + 1); //calloc( 1, lSize+1 );
+        if( ret_str ) {
+             status = fread(ret_str, fsize, 1, fp);
+             if ( ferror( fp ) == 0 ) {
+                //if (status == fsize) {
+                ret_str[fsize] = 0;
+             } else {
+                free(ret_str);
+                ret_str = NULL;
+             }
+        }
+
+closefile:
+        fclose(fp);
+    }
+
+    return ret_str;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -545,7 +589,7 @@ int main(int argc, char **argv)
 	signal(SIGPIPE, SIG_IGN);
 	init_ustream_ssl();
 
-	while ((ch = getopt_long(argc, argv, "46cO:P:qsT:U:Y:", longopts, &longopt_idx)) != -1) {
+	while ((ch = getopt_long(argc, argv, "46cO:P:qsT:U:H:Y:", longopts, &longopt_idx)) != -1) {
 		switch(ch) {
 		case 0:
 			switch (longopt_idx) {
@@ -610,6 +654,11 @@ int main(int argc, char **argv)
 		case 'U':
 			user_agent = optarg;
 			break;
+
+		case 'H':
+			custom_header_file = optarg;
+			break;
+
 		case 'O':
 			output_file = optarg;
 			break;
@@ -681,6 +730,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to allocate uclient context\n");
 		return 1;
 	}
+
+	if (strlen(custom_header_file) > 0) {
+        cl->custom_header = read_http_header(custom_header_file);
+	} else {
+		cl->custom_header = NULL;
+	}
+
+
 	if (af >= 0)
 	    uclient_http_set_address_family(cl, af);
 

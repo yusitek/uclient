@@ -75,6 +75,8 @@ struct uclient {
 
 	struct uloop_timeout connection_timeout;
 	struct uloop_timeout timeout;
+
+	const char *custom_header;
 };
 
 struct uclient_cb {

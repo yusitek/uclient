@@ -567,11 +567,17 @@ uclient_http_send_headers(struct uclient_http *uh)
 	if (uh->uc.proxy_url)
 		url = uh->uc.proxy_url;
 
-	ustream_printf(uh->us,
-		"%s %s HTTP/1.1\r\n"
-		"Host: %s\r\n",
-		request_types[req_type],
-		url->location, url->host);
+	if (uh->uc.custom_header == NULL) {
+		ustream_printf(uh->us,
+			"%s %s HTTP/1.1\r\n"
+			"Host: %s\r\n",
+			request_types[req_type],
+			url->location, url->host);
+	} else {
+		ustream_printf(uh->us,
+			"%s %s HTTP/1.1\r\n%s",
+			request_types[req_type], url->location, uh->uc.custom_header);
+	}
 
 	blobmsg_for_each_attr(cur, uh->headers.head, rem)
 		ustream_printf(uh->us, "%s: %s\r\n", blobmsg_name(cur), (char *) blobmsg_data(cur));
